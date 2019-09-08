@@ -448,25 +448,38 @@ func initCache() {
 		}
 		defer rows.Close()
 
+		var cnt int64
 		for rows.Next() {
+			cnt++
 			var sheet Sheet
 			var reservation Reservation
 
 			if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price, &reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
 				panic(err)
 			}
-			if err == nil {
-				sheet.ReservedUserID = reservation.UserID
-				sheet.Reserved = true
-				sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
-				EventRemainsCache[event.ID]--
-				sheets[sheet.Rank].Remains--
-			} else if err == sql.ErrNoRows {
-			} else {
-				panic(err)
+			sheet.ReservedUserID = reservation.UserID
+			sheet.Reserved = true
+			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
+			EventRemainsCache[event.ID]--
+			sheets[sheet.Rank].Remains--
+
+			for {
+				if sheet.ID == cnt {
+					break
+				} else {
+					sheets[sheet.Rank].Detail = append(sheets[sheet.Rank].Detail, &Sheet{})
+					cnt++
+				}
 			}
+
 			sheets[sheet.Rank].Detail = append(sheets[sheet.Rank].Detail, &sheet)
 		}
+		for _, rank := range []string{"S", "A", "B", "C"} {
+			for len(sheets[rank].Detail) < sheets[rank].Total {
+				sheets[rank].Detail = append(sheets[rank].Detail, &Sheet{})
+			}
+		}
+
 		EventSheetsCache[eventSheetsHash(event.ID, "S")] = sheets["S"]
 		EventSheetsCache[eventSheetsHash(event.ID, "A")] = sheets["A"]
 		EventSheetsCache[eventSheetsHash(event.ID, "B")] = sheets["B"]
