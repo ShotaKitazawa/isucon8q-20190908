@@ -70,7 +70,7 @@ type Sheet struct {
 	ReservedAt     *time.Time `json:"-"`
 	ReservedAtUnix int64      `json:"reserved_at,omitempty"`
 
-	ReservedUserID int64
+	ReservedUserID int64 `json:"-"`
 }
 
 type Reservation struct {
