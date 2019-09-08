@@ -464,7 +464,7 @@ func initCache() {
 			sheets[sheet.Rank].Remains--
 
 			for {
-				if sheet.ID == cnt {
+				if sheet.Num == cnt {
 					break
 				} else {
 					sheets[sheet.Rank].Detail = append(sheets[sheet.Rank].Detail, &Sheet{})
