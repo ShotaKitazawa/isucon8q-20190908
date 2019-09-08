@@ -870,7 +870,7 @@ func main() {
 		// DONE: EventRemainsCache, EventSheetsCache
 		EventRemainsCache[event.ID]++
 		sheet.Reserved = false
-		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)] = &sheet
+		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheetID2sheetNum(sheet.ID-1, sheetID2sheetRank(sheet.ID))] = &sheet
 
 		return c.NoContent(204)
 	}, loginRequired)
