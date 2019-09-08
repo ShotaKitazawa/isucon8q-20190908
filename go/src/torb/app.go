@@ -96,6 +96,40 @@ type Administrator struct {
 	PassHash  string `json:"pass_hash,omitempty"`
 }
 
+func sheetID2sheetRank(sheetID int64) string {
+	switch {
+	case 0 <= sheetID && sheetID < 50:
+		return "S"
+
+	case 50 <= sheetID && sheetID < 200:
+		return "A"
+
+	case 200 <= sheetID && sheetID < 500:
+		return "B"
+
+	//case 500 <= sheetID && sheetID < 1000
+	default:
+		return "C"
+	}
+}
+func sheetID2sheetNum(sheetID int64, rank string) int64 {
+	switch rank {
+	case "S":
+		return sheetID
+
+	case "A":
+		return sheetID - 50
+
+	case "B":
+		return sheetID - 200
+
+	//case "C"
+	default:
+		return sheetID - 500
+
+	}
+}
+
 func eventSheetsHash(eventID int64, sheet string) string {
 	return fmt.Sprintf("%x", sha1.Sum([]byte(strconv.Itoa(int(eventID))+sheet)))
 }
@@ -242,43 +276,61 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	if err := db.QueryRow("SELECT * FROM events WHERE id = ?", eventID).Scan(&event.ID, &event.Title, &event.PublicFg, &event.ClosedFg, &event.Price); err != nil {
 		return nil, err
 	}
+	event.Total = EventTotalCache[eventID]
+	event.Remains = EventRemainsCache[eventID]
 	event.Sheets = map[string]*Sheets{
-		"S": &Sheets{},
-		"A": &Sheets{},
-		"B": &Sheets{},
-		"C": &Sheets{},
+		"S": EventSheetsCache[eventSheetsHash(eventID, "S")],
+		"A": EventSheetsCache[eventSheetsHash(eventID, "A")],
+		"B": EventSheetsCache[eventSheetsHash(eventID, "B")],
+		"C": EventSheetsCache[eventSheetsHash(eventID, "C")],
 	}
-
-	rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var sheet Sheet
-		if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
-			return nil, err
+	for rank, sheets := range event.Sheets {
+		for idx, sheet := range sheets.Detail {
+			if sheet.ReservedUserID == loginUserID {
+				event.Sheets[rank].Detail[idx].Mine = true
+			}
 		}
-		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
-		event.Total++
-		event.Sheets[sheet.Rank].Total++
+	}
 
-		var reservation Reservation
-		err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
-		if err == nil {
-			sheet.Mine = reservation.UserID == loginUserID
-			sheet.Reserved = true
-			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
-		} else if err == sql.ErrNoRows {
-			event.Remains++
-			event.Sheets[sheet.Rank].Remains++
-		} else {
-			return nil, err
+	/*
+		event.Sheets = map[string]*Sheets{
+			"S": &Sheets{},
+			"A": &Sheets{},
+			"B": &Sheets{},
+			"C": &Sheets{},
 		}
 
-		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
-	}
+		rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var sheet Sheet
+			if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
+				return nil, err
+			}
+			event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
+			event.Total++
+			event.Sheets[sheet.Rank].Total++
+
+			var reservation Reservation
+			err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
+			if err == nil {
+				sheet.Mine = reservation.UserID == loginUserID
+				sheet.Reserved = true
+				sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
+			} else if err == sql.ErrNoRows {
+				event.Remains++
+				event.Sheets[sheet.Rank].Remains++
+			} else {
+				return nil, err
+			}
+
+			event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+		}
+	*/
 
 	return &event, nil
 }
@@ -398,7 +450,6 @@ func initCache() {
 				panic(err)
 			}
 			event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
-			event.Total++
 			event.Sheets[sheet.Rank].Total++
 
 			var reservation Reservation
@@ -408,7 +459,6 @@ func initCache() {
 				sheet.Reserved = true
 				sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
 			} else if err == sql.ErrNoRows {
-				event.Remains++
 				event.Sheets[sheet.Rank].Remains++
 			} else {
 				panic(err)
@@ -420,29 +470,31 @@ func initCache() {
 		EventSheetsCache[eventSheetsHash(event.ID, "B")] = event.Sheets["B"]
 		EventSheetsCache[eventSheetsHash(event.ID, "C")] = event.Sheets["C"]
 
-		// print debug
-		if event.ID == 11 {
-			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "S")].Detail {
-				if sheet.Reserved {
-					fmt.Println(sheet.ID)
+		/*
+			// print debug
+			if event.ID == 11 {
+				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "S")].Detail {
+					if sheet.Reserved {
+						fmt.Println(sheet.ID)
+					}
+				}
+				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "A")].Detail {
+					if sheet.Reserved {
+						fmt.Println(sheet.ID)
+					}
+				}
+				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "B")].Detail {
+					if sheet.Reserved {
+						fmt.Println(sheet.ID)
+					}
+				}
+				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "C")].Detail {
+					if sheet.Reserved {
+						fmt.Println(sheet.ID)
+					}
 				}
 			}
-			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "A")].Detail {
-				if sheet.Reserved {
-					fmt.Println(sheet.ID)
-				}
-			}
-			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "B")].Detail {
-				if sheet.Reserved {
-					fmt.Println(sheet.ID)
-				}
-			}
-			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "C")].Detail {
-				if sheet.Reserved {
-					fmt.Println(sheet.ID)
-				}
-			}
-		}
+		*/
 
 	}
 }
@@ -718,6 +770,7 @@ func main() {
 
 		var sheet Sheet
 		var reservationID int64
+		var now time.Time
 		for {
 			if err := db.QueryRow("SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = ? AND canceled_at IS NULL FOR UPDATE) AND `rank` = ? ORDER BY RAND() LIMIT 1", event.ID, params.Rank).Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
 				if err == sql.ErrNoRows {
@@ -731,8 +784,9 @@ func main() {
 				return err
 			}
 
-			// TODO: EventTotalCache
-			res, err := tx.Exec("INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)", event.ID, sheet.ID, user.ID, time.Now().UTC().Format("2006-01-02 15:04:05.000000"))
+			now = time.Now().UTC()
+
+			res, err := tx.Exec("INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)", event.ID, sheet.ID, user.ID, now.Format("2006-01-02 15:04:05.000000"))
 			if err != nil {
 				tx.Rollback()
 				log.Println("re-try: rollback by", err)
@@ -752,6 +806,13 @@ func main() {
 
 			break
 		}
+		// DONE: EventRemainsCache, EventSheetsCache
+		EventRemainsCache[event.ID]--
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].Reserved = true
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAt = &now
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAtUnix = now.Unix()
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedUserID = user.ID
+
 		return c.JSON(202, echo.Map{
 			"id":         reservationID,
 			"sheet_rank": params.Rank,
@@ -811,7 +872,6 @@ func main() {
 			return resError(c, "not_permitted", 403)
 		}
 
-		// TODO: EventRemainsCache, EventSheetsCache
 		if _, err := tx.Exec("UPDATE reservations SET canceled_at = ? WHERE id = ?", time.Now().UTC().Format("2006-01-02 15:04:05.000000"), reservation.ID); err != nil {
 			tx.Rollback()
 			return err
@@ -820,6 +880,10 @@ func main() {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+		// DONE: EventRemainsCache, EventSheetsCache
+		EventRemainsCache[event.ID]++
+		sheet.Reserved = false
+		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheet.ID-1] = &sheet
 
 		return c.NoContent(204)
 	}, loginRequired)
@@ -892,7 +956,6 @@ func main() {
 			return err
 		}
 
-		// TODO: EventRemainsCache, EventTotalCache, EventSheetsCache
 		res, err := tx.Exec("INSERT INTO events (title, public_fg, closed_fg, price) VALUES (?, ?, 0, ?)", params.Title, params.Public, params.Price)
 		if err != nil {
 			tx.Rollback()
@@ -905,6 +968,61 @@ func main() {
 		}
 		if err := tx.Commit(); err != nil {
 			return err
+		}
+		// DONE: EventTotalCache, EventRemainsCache, EventSheetsCache
+		EventTotalCache[eventID] = 1000
+		EventRemainsCache[eventID] = 1000
+		EventSheetsCache[eventSheetsHash(eventID, "S")] = &Sheets{
+			Total:   50,
+			Remains: 50,
+			Price:   int64(params.Price + 5000),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "S")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "S")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "S")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "S",
+				Num:   sheetID2sheetNum(int64(i), "S"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "S")].Price,
+			})
+		}
+		EventSheetsCache[eventSheetsHash(eventID, "A")] = &Sheets{
+			Total:   150,
+			Remains: 150,
+			Price:   int64(params.Price + 3000),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "A")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "A")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "A")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "A",
+				Num:   sheetID2sheetNum(int64(i), "A"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "A")].Price,
+			})
+		}
+		EventSheetsCache[eventSheetsHash(eventID, "B")] = &Sheets{
+			Total:   300,
+			Remains: 300,
+			Price:   int64(params.Price + 1000),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "B")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "B")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "B")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "B",
+				Num:   sheetID2sheetNum(int64(i), "B"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "B")].Price,
+			})
+		}
+		EventSheetsCache[eventSheetsHash(eventID, "C")] = &Sheets{
+			Total:   500,
+			Remains: 500,
+			Price:   int64(params.Price),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "C")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "C")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "C")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "C",
+				Num:   sheetID2sheetNum(int64(i), "C"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "C")].Price,
+			})
 		}
 
 		event, err := getEvent(eventID, -1)
