@@ -257,7 +257,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	defer rows.Close()
 
 	for _, rank := range []string{"S", "A", "B", "C"} {
-		for i := 1; i < event.Sheets[rank].Total; i++ {
+		for i := 1; i <= event.Sheets[rank].Total; i++ {
 			event.Sheets[rank].Detail = append(event.Sheets[rank].Detail, &Sheet{
 				Num: int64(i),
 			})
