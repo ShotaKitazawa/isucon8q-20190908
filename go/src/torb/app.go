@@ -410,28 +410,7 @@ func initCache() {
 		EventTotalCache[event.ID] = 1000
 		EventRemainsCache[event.ID] = 1000
 
-		EventSheetsCache[eventSheetsHash(event.ID, "S")] = &Sheets{
-			Total:   50,
-			Remains: 50,
-			Price:   event.Price + 5000,
-		}
-		EventSheetsCache[eventSheetsHash(event.ID, "A")] = &Sheets{
-			Total:   150,
-			Remains: 150,
-			Price:   event.Price + 3000,
-		}
-		EventSheetsCache[eventSheetsHash(event.ID, "B")] = &Sheets{
-			Total:   300,
-			Remains: 300,
-			Price:   event.Price + 1000,
-		}
-		EventSheetsCache[eventSheetsHash(event.ID, "C")] = &Sheets{
-			Total:   500,
-			Remains: 500,
-			Price:   event.Price,
-		}
-
-		event.Sheets = map[string]*Sheets{
+		sheets := map[string]*Sheets{
 			"S": &Sheets{},
 			"A": &Sheets{},
 			"B": &Sheets{},
@@ -449,8 +428,8 @@ func initCache() {
 			if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
 				panic(err)
 			}
-			event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
-			event.Sheets[sheet.Rank].Total++
+			sheets[sheet.Rank].Price = event.Price + sheet.Price
+			sheets[sheet.Rank].Total++
 
 			var reservation Reservation
 			err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
@@ -459,42 +438,27 @@ func initCache() {
 				sheet.Reserved = true
 				sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
 			} else if err == sql.ErrNoRows {
-				event.Sheets[sheet.Rank].Remains++
+				sheets[sheet.Rank].Remains++
 			} else {
 				panic(err)
 			}
-			event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+			sheets[sheet.Rank].Detail = append(sheets[sheet.Rank].Detail, &sheet)
 		}
-		EventSheetsCache[eventSheetsHash(event.ID, "S")] = event.Sheets["S"]
-		EventSheetsCache[eventSheetsHash(event.ID, "A")] = event.Sheets["A"]
-		EventSheetsCache[eventSheetsHash(event.ID, "B")] = event.Sheets["B"]
-		EventSheetsCache[eventSheetsHash(event.ID, "C")] = event.Sheets["C"]
+		EventSheetsCache[eventSheetsHash(event.ID, "S")] = sheets["S"]
+		EventSheetsCache[eventSheetsHash(event.ID, "A")] = sheets["A"]
+		EventSheetsCache[eventSheetsHash(event.ID, "B")] = sheets["B"]
+		EventSheetsCache[eventSheetsHash(event.ID, "C")] = sheets["C"]
 
-		/*
-			// print debug
-			if event.ID == 11 {
-				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "S")].Detail {
-					if sheet.Reserved {
-						fmt.Println(sheet.ID)
-					}
-				}
-				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "A")].Detail {
-					if sheet.Reserved {
-						fmt.Println(sheet.ID)
-					}
-				}
-				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "B")].Detail {
-					if sheet.Reserved {
-						fmt.Println(sheet.ID)
-					}
-				}
-				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "C")].Detail {
+		// print debug
+		if event.ID == 11 {
+			for _, val := range "SABC" {
+				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, fmt.Sprintf("%#U", val))].Detail {
 					if sheet.Reserved {
 						fmt.Println(sheet.ID)
 					}
 				}
 			}
-		*/
+		}
 
 	}
 }
