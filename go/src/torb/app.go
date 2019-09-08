@@ -795,10 +795,10 @@ func main() {
 		}
 		// DONE: EventRemainsCache, EventSheetsCache
 		EventRemainsCache[event.ID]--
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].Reserved = true
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAt = &now
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAtUnix = now.Unix()
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedUserID = user.ID
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].Reserved = true
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].ReservedAt = &now
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].ReservedAtUnix = now.Unix()
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].ReservedUserID = user.ID
 
 		return c.JSON(202, echo.Map{
 			"id":         reservationID,
@@ -870,7 +870,7 @@ func main() {
 		// DONE: EventRemainsCache, EventSheetsCache
 		EventRemainsCache[event.ID]++
 		sheet.Reserved = false
-		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheet.ID-1] = &sheet
+		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)] = &sheet
 
 		return c.NoContent(204)
 	}, loginRequired)
