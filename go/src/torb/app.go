@@ -451,8 +451,8 @@ func initCache() {
 
 		// print debug
 		if event.ID == 11 {
-			for _, val := range "SABC" {
-				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, fmt.Sprintf("%#U", val))].Detail {
+			for _, val := range []string{"S", "A", "B", "C"} {
+				for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, val)].Detail {
 					if sheet.Reserved {
 						fmt.Println(sheet.ID)
 					}
