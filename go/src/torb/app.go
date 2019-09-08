@@ -21,7 +21,6 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
-	"github.com/jinzhu/copier"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
@@ -279,9 +278,11 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	}
 	event.Total = EventTotalCache[eventID]
 	event.Remains = EventRemainsCache[eventID]
-	event.Sheets = map[string]*Sheets{}
-	for _, rank := range []string{"S", "A", "B", "C"} {
-		copier.Copy(event.Sheets[rank], EventSheetsCache[eventSheetsHash(eventID, rank)])
+	event.Sheets = map[string]*Sheets{
+		"S": EventSheetsCache[eventSheetsHash(eventID, "S")],
+		"A": EventSheetsCache[eventSheetsHash(eventID, "A")],
+		"B": EventSheetsCache[eventSheetsHash(eventID, "B")],
+		"C": EventSheetsCache[eventSheetsHash(eventID, "C")],
 	}
 	for rank, sheets := range event.Sheets {
 		for idx, sheet := range sheets.Detail {
@@ -290,7 +291,16 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 			}
 		}
 	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		panic(err)
+	}
+	var result Event
+	if err := json.Unmarshal(data, &result); err != nil {
+		panic(err)
+	}
 
+	return &result, nil
 	/*
 		event.Sheets = map[string]*Sheets{
 			"S": &Sheets{},
@@ -329,9 +339,9 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 
 			event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
 		}
-	*/
 
 	return &event, nil
+	*/
 }
 
 func sanitizeEvent(e *Event) *Event {
