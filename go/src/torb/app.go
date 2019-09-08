@@ -112,20 +112,37 @@ func sheetID2sheetRank(sheetID int64) string {
 		return "C"
 	}
 }
-func sheetID2sheetNum(sheetID int64, rank string) int64 {
-	switch rank {
-	case "S":
+func sheetID2sheetNum(sheetID int64) int64 {
+	switch {
+	case 0 <= sheetID && sheetID < 50:
 		return sheetID
 
-	case "A":
+	case 50 <= sheetID && sheetID < 200:
 		return sheetID - 50
 
-	case "B":
+	case 200 <= sheetID && sheetID < 500:
 		return sheetID - 200
+
+	//case 500 <= sheetID && sheetID < 1000
+	default:
+		return sheetID - 500
+
+	}
+}
+func sheetNum2sheetID(sheetNum int64, rank string) int64 {
+	switch rank {
+	case "S":
+		return sheetNum
+
+	case "A":
+		return sheetNum + 50
+
+	case "B":
+		return sheetNum + 200
 
 	//case "C"
 	default:
-		return sheetID - 500
+		return sheetNum + 500
 
 	}
 }
@@ -449,8 +466,11 @@ func initCache() {
 		defer rows.Close()
 
 		for _, rank := range []string{"S", "A", "B", "C"} {
-			for i := 0; i < sheets[rank].Total; i++ {
-				sheets[rank].Detail = append(sheets[rank].Detail, &Sheet{})
+			for i := 1; i <= sheets[rank].Total; i++ {
+				sheets[rank].Detail = append(sheets[rank].Detail, &Sheet{
+					ID: sheetNum2sheetID(int64(i), rank),
+					Num: int64(i),
+				})
 			}
 		}
 
@@ -800,10 +820,10 @@ func main() {
 		}
 		// DONE: EventRemainsCache, EventSheetsCache
 		EventRemainsCache[event.ID]--
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].Reserved = true
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].ReservedAt = &now
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].ReservedAtUnix = now.Unix()
-		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1, params.Rank)].ReservedUserID = user.ID
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1)].Reserved = true
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1)].ReservedAt = &now
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1)].ReservedAtUnix = now.Unix()
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheetID2sheetNum(sheet.ID-1)].ReservedUserID = user.ID
 
 		return c.JSON(202, echo.Map{
 			"id":         reservationID,
@@ -875,7 +895,7 @@ func main() {
 		// DONE: EventRemainsCache, EventSheetsCache
 		EventRemainsCache[event.ID]++
 		sheet.Reserved = false
-		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheetID2sheetNum(sheet.ID-1, sheetID2sheetRank(sheet.ID))] = &sheet
+		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheetID2sheetNum(sheet.ID-1)] = &sheet
 
 		return c.NoContent(204)
 	}, loginRequired)
@@ -973,7 +993,7 @@ func main() {
 			EventSheetsCache[eventSheetsHash(eventID, "S")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "S")].Detail, &Sheet{
 				ID:    int64(i),
 				Rank:  "S",
-				Num:   sheetID2sheetNum(int64(i), "S"),
+				Num:   sheetID2sheetNum(int64(i)),
 				Price: EventSheetsCache[eventSheetsHash(eventID, "S")].Price,
 			})
 		}
@@ -986,7 +1006,7 @@ func main() {
 			EventSheetsCache[eventSheetsHash(eventID, "A")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "A")].Detail, &Sheet{
 				ID:    int64(i),
 				Rank:  "A",
-				Num:   sheetID2sheetNum(int64(i), "A"),
+				Num:   sheetID2sheetNum(int64(i)),
 				Price: EventSheetsCache[eventSheetsHash(eventID, "A")].Price,
 			})
 		}
@@ -999,7 +1019,7 @@ func main() {
 			EventSheetsCache[eventSheetsHash(eventID, "B")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "B")].Detail, &Sheet{
 				ID:    int64(i),
 				Rank:  "B",
-				Num:   sheetID2sheetNum(int64(i), "B"),
+				Num:   sheetID2sheetNum(int64(i)),
 				Price: EventSheetsCache[eventSheetsHash(eventID, "B")].Price,
 			})
 		}
@@ -1012,7 +1032,7 @@ func main() {
 			EventSheetsCache[eventSheetsHash(eventID, "C")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "C")].Detail, &Sheet{
 				ID:    int64(i),
 				Rank:  "C",
-				Num:   sheetID2sheetNum(int64(i), "C"),
+				Num:   sheetID2sheetNum(int64(i)),
 				Price: EventSheetsCache[eventSheetsHash(eventID, "C")].Price,
 			})
 		}
