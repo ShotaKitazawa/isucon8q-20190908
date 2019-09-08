@@ -437,6 +437,7 @@ func initCache() {
 				sheet.ReservedUserID = reservation.UserID
 				sheet.Reserved = true
 				sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
+				EventRemainsCache[event.ID]--
 			} else if err == sql.ErrNoRows {
 				sheets[sheet.Rank].Remains++
 			} else {
