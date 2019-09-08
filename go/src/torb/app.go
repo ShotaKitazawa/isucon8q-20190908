@@ -442,7 +442,7 @@ func initCache() {
 			},
 		}
 
-		rows, err := db.Query("SELECT s.*, r.* FROM reservations AS r JOIN sheets AS s ON r.sheet_id = s.id WHERE event_id = ? and canceled_at is null ORDER BY s.rank, s.num")
+		rows, err := db.Query("SELECT s.*, r.* FROM reservations AS r JOIN sheets AS s ON r.sheet_id = s.id WHERE event_id = ? and canceled_at is null ORDER BY s.rank, s.num", event.ID)
 		if err != nil {
 			panic(err)
 		}
