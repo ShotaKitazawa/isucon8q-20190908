@@ -21,6 +21,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
+	"github.com/jinzhu/copier"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
@@ -263,9 +264,9 @@ func getEvents(all bool) ([]*Event, error) {
 		if err != nil {
 			return nil, err
 		}
-		for k := range event.Sheets {
-			event.Sheets[k].Detail = nil
-		}
+		//for k := range event.Sheets {
+		//	event.Sheets[k].Detail = nil
+		//}
 		events[i] = event
 	}
 	return events, nil
@@ -278,11 +279,9 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	}
 	event.Total = EventTotalCache[eventID]
 	event.Remains = EventRemainsCache[eventID]
-	event.Sheets = map[string]*Sheets{
-		"S": EventSheetsCache[eventSheetsHash(eventID, "S")],
-		"A": EventSheetsCache[eventSheetsHash(eventID, "A")],
-		"B": EventSheetsCache[eventSheetsHash(eventID, "B")],
-		"C": EventSheetsCache[eventSheetsHash(eventID, "C")],
+	event.Sheets = map[string]*Sheets{}
+	for _, rank := range []string{"S", "A", "B", "C"} {
+		copier.Copy(event.Sheets[rank], EventSheetsCache[eventSheetsHash(eventID, rank)])
 	}
 	for rank, sheets := range event.Sheets {
 		for idx, sheet := range sheets.Detail {
@@ -490,13 +489,11 @@ func main() {
 		for i, v := range events {
 			events[i] = sanitizeEvent(v)
 		}
-		return nil
-
-		//return c.Render(200, "index.tmpl", echo.Map{
-		//	"events": events,
-		//	"user":   c.Get("user"),
-		//	"origin": c.Scheme() + "://" + c.Request().Host,
-		//})
+		return c.Render(200, "index.tmpl", echo.Map{
+			"events": events,
+			"user":   c.Get("user"),
+			"origin": c.Scheme() + "://" + c.Request().Host,
+		})
 	}, fillinUser)
 	e.GET("/initialize", func(c echo.Context) error {
 		cmd := exec.Command("../../db/init.sh")
