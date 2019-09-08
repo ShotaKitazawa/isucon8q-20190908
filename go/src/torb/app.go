@@ -234,18 +234,22 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		"S": &Sheets{
 			Total:   50,
 			Remains: 50,
+			Price:   event.Price + 5000,
 		},
 		"A": &Sheets{
 			Total:   150,
 			Remains: 150,
+			Price:   event.Price + 3000,
 		},
 		"B": &Sheets{
 			Total:   300,
 			Remains: 300,
+			Price:   event.Price + 1000,
 		},
 		"C": &Sheets{
 			Total:   500,
 			Remains: 500,
+			Price:   event.Price,
 		},
 	}
 
