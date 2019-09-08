@@ -490,11 +490,13 @@ func main() {
 		for i, v := range events {
 			events[i] = sanitizeEvent(v)
 		}
-		return c.Render(200, "index.tmpl", echo.Map{
-			"events": events,
-			"user":   c.Get("user"),
-			"origin": c.Scheme() + "://" + c.Request().Host,
-		})
+		return nil
+
+		//return c.Render(200, "index.tmpl", echo.Map{
+		//	"events": events,
+		//	"user":   c.Get("user"),
+		//	"origin": c.Scheme() + "://" + c.Request().Host,
+		//})
 	}, fillinUser)
 	e.GET("/initialize", func(c echo.Context) error {
 		cmd := exec.Command("../../db/init.sh")
@@ -771,12 +773,12 @@ func main() {
 
 			break
 		}
-		//// DONE: EventRemainsCache, EventSheetsCache
-		//EventRemainsCache[event.ID]--
-		//EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].Reserved = true
-		//EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAt = &now
-		//EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAtUnix = now.Unix()
-		//EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedUserID = user.ID
+		// DONE: EventRemainsCache, EventSheetsCache
+		EventRemainsCache[event.ID]--
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].Reserved = true
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAt = &now
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedAtUnix = now.Unix()
+		EventSheetsCache[eventSheetsHash(event.ID, params.Rank)].Detail[sheet.ID-1].ReservedUserID = user.ID
 
 		return c.JSON(202, echo.Map{
 			"id":         reservationID,
@@ -845,10 +847,10 @@ func main() {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		//// DONE: EventRemainsCache, EventSheetsCache
-		//EventRemainsCache[event.ID]++
-		//sheet.Reserved = false
-		//EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheet.ID-1] = &sheet
+		// DONE: EventRemainsCache, EventSheetsCache
+		EventRemainsCache[event.ID]++
+		sheet.Reserved = false
+		EventSheetsCache[eventSheetsHash(event.ID, sheetID2sheetRank(sheet.ID))].Detail[sheet.ID-1] = &sheet
 
 		return c.NoContent(204)
 	}, loginRequired)
@@ -934,61 +936,61 @@ func main() {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		//// DONE: EventTotalCache, EventRemainsCache, EventSheetsCache
-		//EventTotalCache[eventID] = 1000
-		//EventRemainsCache[eventID] = 1000
-		//EventSheetsCache[eventSheetsHash(eventID, "S")] = &Sheets{
-		//	Total:   50,
-		//	Remains: 50,
-		//	Price:   int64(params.Price + 5000),
-		//}
-		//for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "S")].Total; i++ {
-		//	EventSheetsCache[eventSheetsHash(eventID, "S")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "S")].Detail, &Sheet{
-		//		ID:    int64(i),
-		//		Rank:  "S",
-		//		Num:   sheetID2sheetNum(int64(i), "S"),
-		//		Price: EventSheetsCache[eventSheetsHash(eventID, "S")].Price,
-		//	})
-		//}
-		//EventSheetsCache[eventSheetsHash(eventID, "A")] = &Sheets{
-		//	Total:   150,
-		//	Remains: 150,
-		//	Price:   int64(params.Price + 3000),
-		//}
-		//for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "A")].Total; i++ {
-		//	EventSheetsCache[eventSheetsHash(eventID, "A")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "A")].Detail, &Sheet{
-		//		ID:    int64(i),
-		//		Rank:  "A",
-		//		Num:   sheetID2sheetNum(int64(i), "A"),
-		//		Price: EventSheetsCache[eventSheetsHash(eventID, "A")].Price,
-		//	})
-		//}
-		//EventSheetsCache[eventSheetsHash(eventID, "B")] = &Sheets{
-		//	Total:   300,
-		//	Remains: 300,
-		//	Price:   int64(params.Price + 1000),
-		//}
-		//for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "B")].Total; i++ {
-		//	EventSheetsCache[eventSheetsHash(eventID, "B")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "B")].Detail, &Sheet{
-		//		ID:    int64(i),
-		//		Rank:  "B",
-		//		Num:   sheetID2sheetNum(int64(i), "B"),
-		//		Price: EventSheetsCache[eventSheetsHash(eventID, "B")].Price,
-		//	})
-		//}
-		//EventSheetsCache[eventSheetsHash(eventID, "C")] = &Sheets{
-		//	Total:   500,
-		//	Remains: 500,
-		//	Price:   int64(params.Price),
-		//}
-		//for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "C")].Total; i++ {
-		//	EventSheetsCache[eventSheetsHash(eventID, "C")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "C")].Detail, &Sheet{
-		//		ID:    int64(i),
-		//		Rank:  "C",
-		//		Num:   sheetID2sheetNum(int64(i), "C"),
-		//		Price: EventSheetsCache[eventSheetsHash(eventID, "C")].Price,
-		//	})
-		//}
+		// DONE: EventTotalCache, EventRemainsCache, EventSheetsCache
+		EventTotalCache[eventID] = 1000
+		EventRemainsCache[eventID] = 1000
+		EventSheetsCache[eventSheetsHash(eventID, "S")] = &Sheets{
+			Total:   50,
+			Remains: 50,
+			Price:   int64(params.Price + 5000),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "S")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "S")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "S")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "S",
+				Num:   sheetID2sheetNum(int64(i), "S"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "S")].Price,
+			})
+		}
+		EventSheetsCache[eventSheetsHash(eventID, "A")] = &Sheets{
+			Total:   150,
+			Remains: 150,
+			Price:   int64(params.Price + 3000),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "A")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "A")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "A")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "A",
+				Num:   sheetID2sheetNum(int64(i), "A"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "A")].Price,
+			})
+		}
+		EventSheetsCache[eventSheetsHash(eventID, "B")] = &Sheets{
+			Total:   300,
+			Remains: 300,
+			Price:   int64(params.Price + 1000),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "B")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "B")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "B")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "B",
+				Num:   sheetID2sheetNum(int64(i), "B"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "B")].Price,
+			})
+		}
+		EventSheetsCache[eventSheetsHash(eventID, "C")] = &Sheets{
+			Total:   500,
+			Remains: 500,
+			Price:   int64(params.Price),
+		}
+		for i := 1; i <= EventSheetsCache[eventSheetsHash(eventID, "C")].Total; i++ {
+			EventSheetsCache[eventSheetsHash(eventID, "C")].Detail = append(EventSheetsCache[eventSheetsHash(eventID, "C")].Detail, &Sheet{
+				ID:    int64(i),
+				Rank:  "C",
+				Num:   sheetID2sheetNum(int64(i), "C"),
+				Price: EventSheetsCache[eventSheetsHash(eventID, "C")].Price,
+			})
+		}
 
 		event, err := getEvent(eventID, -1)
 		if err != nil {
