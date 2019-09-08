@@ -379,6 +379,13 @@ func initCache() {
 			Price:   event.Price,
 		}
 
+		event.Sheets = map[string]*Sheets{
+			"S": &Sheets{},
+			"A": &Sheets{},
+			"B": &Sheets{},
+			"C": &Sheets{},
+		}
+
 		rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
 		if err != nil {
 			panic(err)
