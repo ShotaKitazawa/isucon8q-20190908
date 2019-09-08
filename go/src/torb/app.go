@@ -256,6 +256,14 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	}
 	defer rows.Close()
 
+	for _, rank := range []string{"S", "A", "B", "C"} {
+		for i := 1; i < event.Sheets[rank].Total; i++ {
+			event.Sheets[rank].Detail = append(event.Sheets[rank].Detail, &Sheet{
+				Num: int64(i),
+			})
+		}
+	}
+
 	for rows.Next() {
 		var sheet Sheet
 		var reservation Reservation
@@ -285,7 +293,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		event.Remains--
 		event.Sheets[sheet.Rank].Remains--
 
-		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+		event.Sheets[sheet.Rank].Detail[sheet.Num-1] = &sheet
 	}
 
 	return &event, nil
