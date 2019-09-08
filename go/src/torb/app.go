@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,13 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
+)
+
+var (
+	db                *sql.DB
+	EventTotalCache   map[int64]int
+	EventRemainsCache map[int64]int
+	EventSheetsCache  map[string]*Sheets
 )
 
 type User struct {
@@ -61,6 +69,8 @@ type Sheet struct {
 	Reserved       bool       `json:"reserved,omitempty"`
 	ReservedAt     *time.Time `json:"-"`
 	ReservedAtUnix int64      `json:"reserved_at,omitempty"`
+
+	ReservedUserID int64
 }
 
 type Reservation struct {
@@ -84,6 +94,10 @@ type Administrator struct {
 	Nickname  string `json:"nickname,omitempty"`
 	LoginName string `json:"login_name,omitempty"`
 	PassHash  string `json:"pass_hash,omitempty"`
+}
+
+func eventSheetsHash(eventID int64, sheet string) string {
+	return fmt.Sprintf("%x", sha1.Sum([]byte(strconv.Itoa(int(eventID))+sheet)))
 }
 
 func sessUserID(c echo.Context) int64 {
@@ -309,11 +323,7 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 	return r.templates.ExecuteTemplate(w, name, data)
 }
 
-var db *sql.DB
-
-func main() {
-	go http.ListenAndServe(":3000", nil)
-
+func init() {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
 		os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
@@ -325,6 +335,115 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	initCache()
+}
+
+func initCache() {
+	EventTotalCache = make(map[int64]int, 64)
+	EventRemainsCache = make(map[int64]int, 64)
+	EventSheetsCache = make(map[string]*Sheets, 64)
+
+	rows, err := db.Query("SELECT * FROM events")
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var event Event
+		if err := rows.Scan(&event.ID, &event.Title, &event.PublicFg, &event.ClosedFg, &event.Price); err != nil {
+			panic(err)
+		}
+		EventTotalCache[event.ID] = 1000
+		EventRemainsCache[event.ID] = 1000
+
+		EventSheetsCache[eventSheetsHash(event.ID, "S")] = &Sheets{
+			Total:   50,
+			Remains: 50,
+			Price:   event.Price + 5000,
+		}
+		EventSheetsCache[eventSheetsHash(event.ID, "A")] = &Sheets{
+			Total:   150,
+			Remains: 150,
+			Price:   event.Price + 3000,
+		}
+		EventSheetsCache[eventSheetsHash(event.ID, "B")] = &Sheets{
+			Total:   300,
+			Remains: 300,
+			Price:   event.Price + 1000,
+		}
+		EventSheetsCache[eventSheetsHash(event.ID, "C")] = &Sheets{
+			Total:   500,
+			Remains: 500,
+			Price:   event.Price,
+		}
+
+		rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
+		if err != nil {
+			panic(err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var sheet Sheet
+			if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
+				panic(err)
+			}
+			event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
+			event.Total++
+			event.Sheets[sheet.Rank].Total++
+
+			var reservation Reservation
+			err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
+			if err == nil {
+				sheet.ReservedUserID = reservation.UserID
+				sheet.Reserved = true
+				sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
+			} else if err == sql.ErrNoRows {
+				event.Remains++
+				event.Sheets[sheet.Rank].Remains++
+			} else {
+				panic(err)
+			}
+			event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+		}
+		EventSheetsCache[eventSheetsHash(event.ID, "S")] = event.Sheets["S"]
+		EventSheetsCache[eventSheetsHash(event.ID, "A")] = event.Sheets["A"]
+		EventSheetsCache[eventSheetsHash(event.ID, "B")] = event.Sheets["B"]
+		EventSheetsCache[eventSheetsHash(event.ID, "C")] = event.Sheets["C"]
+
+		// print debug
+		if event.ID == 11 {
+			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "S")].Detail {
+				if sheet.Reserved {
+					fmt.Println(sheet.ID)
+				}
+			}
+			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "A")].Detail {
+				if sheet.Reserved {
+					fmt.Println(sheet.ID)
+				}
+			}
+			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "B")].Detail {
+				if sheet.Reserved {
+					fmt.Println(sheet.ID)
+				}
+			}
+			for _, sheet := range EventSheetsCache[eventSheetsHash(event.ID, "C")].Detail {
+				if sheet.Reserved {
+					fmt.Println(sheet.ID)
+				}
+			}
+		}
+
+	}
+}
+
+func main() {
+	var err error
+
+	go http.ListenAndServe(":3000", nil)
 
 	e := echo.New()
 	funcs := template.FuncMap{
@@ -361,6 +480,7 @@ func main() {
 		if err != nil {
 			return nil
 		}
+		initCache()
 
 		return c.NoContent(204)
 	})
@@ -604,6 +724,7 @@ func main() {
 				return err
 			}
 
+			// TODO: EventTotalCache
 			res, err := tx.Exec("INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)", event.ID, sheet.ID, user.ID, time.Now().UTC().Format("2006-01-02 15:04:05.000000"))
 			if err != nil {
 				tx.Rollback()
@@ -683,6 +804,7 @@ func main() {
 			return resError(c, "not_permitted", 403)
 		}
 
+		// TODO: EventRemainsCache, EventSheetsCache
 		if _, err := tx.Exec("UPDATE reservations SET canceled_at = ? WHERE id = ?", time.Now().UTC().Format("2006-01-02 15:04:05.000000"), reservation.ID); err != nil {
 			tx.Rollback()
 			return err
@@ -763,6 +885,7 @@ func main() {
 			return err
 		}
 
+		// TODO: EventRemainsCache, EventTotalCache, EventSheetsCache
 		res, err := tx.Exec("INSERT INTO events (title, public_fg, closed_fg, price) VALUES (?, ?, 0, ?)", params.Title, params.Public, params.Price)
 		if err != nil {
 			tx.Rollback()
