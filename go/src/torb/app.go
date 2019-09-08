@@ -448,6 +448,12 @@ func initCache() {
 		}
 		defer rows.Close()
 
+		for _, rank := range []string{"S", "A", "B", "C"} {
+			for i := 0; i < sheets[rank].Total; i++ {
+				sheets[rank].Detail = append(sheets[rank].Detail, &Sheet{})
+			}
+		}
+
 		var cnt int64
 		for rows.Next() {
 			cnt++
@@ -463,21 +469,7 @@ func initCache() {
 			EventRemainsCache[event.ID]--
 			sheets[sheet.Rank].Remains--
 
-			for {
-				if sheet.Num == cnt {
-					break
-				} else {
-					sheets[sheet.Rank].Detail = append(sheets[sheet.Rank].Detail, &Sheet{})
-					cnt++
-				}
-			}
-
-			sheets[sheet.Rank].Detail = append(sheets[sheet.Rank].Detail, &sheet)
-		}
-		for _, rank := range []string{"S", "A", "B", "C"} {
-			for len(sheets[rank].Detail) < sheets[rank].Total {
-				sheets[rank].Detail = append(sheets[rank].Detail, &Sheet{})
-			}
+			sheets[sheet.Rank].Detail[sheet.Num-1] = &sheet
 		}
 
 		EventSheetsCache[eventSheetsHash(event.ID, "S")] = sheets["S"]
